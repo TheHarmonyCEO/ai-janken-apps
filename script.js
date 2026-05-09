@@ -135,3 +135,77 @@ const camera = new Camera(videoElement, {
 function executeGame(userHand, source) {
     isWaitingForInput = false;
     if (recognition) recognition.stop();
+    gestureBuffer = [];
+
+    const pcHand = HAND_TYPES[Math.floor(Math.random() * HAND_TYPES.length)];
+    const isAiko = (userHand === pcHand);
+    let resultMessage = "";
+
+    if (isAiko) {
+        resultMessage = "あいこ！";
+    } else if (
+        (userHand === 'グー' && pcHand === 'チョキ') ||
+        (userHand === 'チョキ' && pcHand === 'パー') ||
+        (userHand === 'パー' && pcHand === 'グー')
+    ) {
+        resultMessage = "あなたの勝ち！🎉";
+    } else {
+        resultMessage = "PCの勝ち！💻";
+    }
+
+    statusText.innerText = isAiko ? "あいこで..." : "結果発表！";
+    cameraStatus.innerText = "判定完了";
+    inputSourceDisplay.innerText = source;
+    userHandDisplay.innerText = HAND_EMOJIS[userHand];
+    pcHandDisplay.innerText = HAND_EMOJIS[pcHand];
+    resultText.innerText = resultMessage;
+
+    if (isAiko) {
+        setTimeout(() => {
+            resetGame(true);
+        }, 1500); 
+    } else {
+        resetBtn.style.display = 'inline-block';
+    }
+}
+
+function resetGame(isAiko = false) {
+    userHandDisplay.innerText = '❔';
+    pcHandDisplay.innerText = '❔';
+    resultText.innerText = '';
+    inputSourceDisplay.innerText = '-';
+    resetBtn.style.display = 'none';
+    
+    if (isAiko) {
+        statusText.innerText = "しょ！（カメラかマイクで手を出してください）";
+    } else {
+        statusText.innerText = "音声で「グー・チョキ・パー」と言うか、カメラに手を見せてください";
+    }
+    
+    cameraStatus.innerText = "監視中...";
+    
+    isWaitingForInput = true;
+    if (recognition) {
+        setTimeout(() => {
+            try { recognition.start(); } catch(e) {}
+        }, 100);
+    }
+}
+
+// ==========================================
+// 4. 初期化・イベントリスナー
+// ==========================================
+startBtn.addEventListener('click', () => {
+    startBtn.style.display = 'none';
+    statusText.innerText = "カメラとマイクを起動しています...";
+    
+    camera.start().then(() => {
+        gameArea.style.display = 'block';
+        resetGame();
+    }).catch(err => {
+        console.error(err);
+        statusText.innerText = "カメラの起動に失敗しました。権限を確認してください。";
+    });
+});
+
+resetBtn.addEventListener('click', () => resetGame(false));
