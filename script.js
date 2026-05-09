@@ -17,11 +17,12 @@ const BUFFER_THRESHOLD = 5;
 const HAND_TYPES = ['グー', 'チョキ', 'パー'];
 const HAND_EMOJIS = { 'グー': '✊', 'チョキ': '✌️', 'パー': '✋' };
 
-// 【追加】音声認識の「表記ゆれ」をすべて吸収するための最強辞書
+// 【超強化】「グー」の聞き間違いをすべて吸収する最強辞書
 const VOICE_DICTIONARY = {
-    'グー': ['グー', 'ぐー', 'グウ', 'ぐう', 'グ', 'ぐ'],
-    'チョキ': ['チョキ', 'ちょき', 'チョ', 'ちょ', 'チキ', 'ちき'],
-    'パー': ['パー', 'ぱー', 'パア', 'ぱあ', 'パ', 'ぱ']
+    // ブー、ウー、クー、ルー、漢字変換の「空」や英語の「goo」まで網羅！
+    'グー': ['グー', 'ぐー', 'グウ', 'ぐう', 'グ', 'ぐ', 'グッ', 'ぐっ', 'ブー', 'ぶー', 'ブルー', 'ウー', 'うー', 'クー', 'くー', 'プー', 'ぷー', 'ルー', 'るー', '空', '食う', '喰う', 'goo', 'Goo'],
+    'チョキ': ['チョキ', 'ちょき', 'チョ', 'ちょ', 'チキ', 'ちき', 'チョッ', 'ちょっ', '初期', '猪木'],
+    'パー': ['パー', 'ぱー', 'パア', 'ぱあ', 'パ', 'ぱ', 'バー', 'ばー', 'パッ', 'ぱっ', 'パン']
 };
 
 // ==========================================
@@ -33,22 +34,20 @@ let recognition = null;
 if (SpeechRecognition) {
     recognition = new SpeechRecognition();
     recognition.continuous = true;
-    recognition.interimResults = true; // 途中結果でもガンガン拾う
+    recognition.interimResults = true;
     recognition.lang = 'ja-JP';
 
     recognition.onresult = (event) => {
         if (!isWaitingForInput) return;
 
         for (let i = event.resultIndex; i < event.results.length; ++i) {
-            // スマホが認識した生のテキストを取得
             const transcript = event.results[i][0].transcript;
             
-            // 辞書と照らし合わせて、どれかに引っかかれば即確定！
             for (const [hand, words] of Object.entries(VOICE_DICTIONARY)) {
                 for (const word of words) {
                     if (transcript.includes(word)) {
                         executeGame(hand, '音声');
-                        return; // 処理終了
+                        return; 
                     }
                 }
             }
@@ -59,7 +58,6 @@ if (SpeechRecognition) {
         if (isWaitingForInput) recognition.start();
     };
     
-    // エラーが起きた時も止まらずに再起動させる
     recognition.onerror = (event) => {
         console.warn("音声認識エラー:", event.error);
         if (isWaitingForInput && event.error !== 'not-allowed') {
@@ -188,7 +186,6 @@ function resetGame(isAiko = false) {
     cameraStatus.innerText = "監視中...";
     
     isWaitingForInput = true;
-    // スマホでマイクが寝てしまうのを防ぐため、少し遅らせて確実につける
     if (recognition) {
         setTimeout(() => {
             try { recognition.start(); } catch(e) {}
