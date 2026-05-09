@@ -17,7 +17,6 @@ const BUFFER_THRESHOLD = 5;
 const HAND_TYPES = ['グー', 'チョキ', 'パー'];
 const HAND_EMOJIS = { 'グー': '✊', 'チョキ': '✌️', 'パー': '✋' };
 
-// 【修正】息づかいや雑音で誤爆する1文字（ウー、ぐ、ぱ等）を削除し、賢く拾う辞書に最適化
 const VOICE_DICTIONARY = {
     'グー': ['グー', 'ぐー', 'グウ', 'ぐう', 'ブー', 'ぶー', 'クー', 'くー', 'プー', 'ぷー', 'ルー', 'るー', '空', '食う', '喰う', 'goo', 'Goo'],
     'チョキ': ['チョキ', 'ちょき', 'チキ', 'ちき', '初期', '猪木', 'チョッ', 'ちょっ'],
@@ -65,7 +64,8 @@ if (SpeechRecognition) {
     };
 
 } else {
-    console.warn("このブラウザはWeb Speech APIをサポートしていません。");
+    // スマホの画面に警告を出す
+    alert("お使いのブラウザは音声認識に対応していません。iPhoneならSafari、AndroidならChromeをお使いください！");
 }
 
 // ==========================================
@@ -199,12 +199,19 @@ startBtn.addEventListener('click', () => {
     startBtn.style.display = 'none';
     statusText.innerText = "カメラとマイクを起動しています...";
     
+    // 【スマホ対応】ボタンを押した直後にマイクを強制起動する（iOS対策）
+    if (recognition) {
+        try { recognition.start(); } catch(e) {}
+    }
+    
     camera.start().then(() => {
         gameArea.style.display = 'block';
         resetGame();
     }).catch(err => {
+        // 【デバッグ追加】エラーが起きたらスマホ画面に直接ポップアップを出す
+        alert("【カメラ起動エラー】 " + err);
         console.error(err);
-        statusText.innerText = "カメラの起動に失敗しました。権限を確認してください。";
+        statusText.innerText = "カメラの起動に失敗しました。設定からカメラの権限を確認してください。";
     });
 });
 
