@@ -177,7 +177,7 @@ function resetGame(isAiko = false) {
     resetBtn.style.display = 'none';
     
     if (isAiko) {
-        statusText.innerText = "しょ！（カメラかマイクで手を出してください）";
+        statusText.innerText = "しょ！（声か手を出してください）";
     } else {
         statusText.innerText = "音声で「グー・チョキ・パー」と言うか、カメラに手を見せてください";
     }
