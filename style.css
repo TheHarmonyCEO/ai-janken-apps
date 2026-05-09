@@ -87,3 +87,10 @@ button:hover {
     color: #e53935;
     min-height: 40px;
 }
+/* --- ステータステキスト（結果発表など）を大きくする --- */
+#status-text {
+    font-size: 24px;      /* タイトル(h1)より少し小さい、ちょうどいいサイズ */
+    font-weight: bold;    /* 文字を太くして目立たせる */
+    color: #333;          /* 文字の色 */
+    margin: 15px 0;       /* 上下の余白を調整 */
+}
