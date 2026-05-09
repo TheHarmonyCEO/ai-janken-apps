@@ -62,14 +62,12 @@ const hands = new Hands({
 hands.setOptions({
     maxNumHands: 1,
     modelComplexity: 1,
-    minDetectionConfidence: 0.6, // 誤検知を防ぐための閾値
+    minDetectionConfidence: 0.6,
     minTrackingConfidence: 0.5
 });
 
 // 手の形状判定ロジック
 function detectHandGesture(landmarks) {
-    // 指が開いているかどうかの判定 (y座標を比較)
-    // 0: 手首, 5/9/13/17: 指の付け根, 8/12/16/20: 指先
     const isFingerOpen = (tipIndex, baseIndex) => landmarks[tipIndex].y < landmarks[baseIndex].y;
 
     const indexOpen = isFingerOpen(8, 5);
@@ -77,11 +75,10 @@ function detectHandGesture(landmarks) {
     const ringOpen = isFingerOpen(16, 13);
     const pinkyOpen = isFingerOpen(20, 17);
 
-    // 単純化のため、親指を除く4本の指の状態で判定
     if (!indexOpen && !middleOpen && !ringOpen && !pinkyOpen) return 'グー';
     if (indexOpen && middleOpen && !ringOpen && !pinkyOpen) return 'チョキ';
     if (indexOpen && middleOpen && ringOpen && pinkyOpen) return 'パー';
-    return null; // 判定不能な中途半端な手
+    return null;
 }
 
 hands.onResults((results) => {
@@ -91,7 +88,6 @@ hands.onResults((results) => {
         const gesture = detectHandGesture(results.multiHandLandmarks[0]);
         
         if (gesture) {
-            // スムージング処理: 一定フレーム連続で同じ形なら確定
             gestureBuffer.push(gesture);
             if (gestureBuffer.length > BUFFER_THRESHOLD) {
                 gestureBuffer.shift();
@@ -104,10 +100,10 @@ hands.onResults((results) => {
                 executeGame(gesture, 'カメラ');
             }
         } else {
-            gestureBuffer = []; // 形状が崩れたらリセット
+            gestureBuffer = [];
         }
     } else {
-        gestureBuffer = []; // 手が映っていない場合もリセット
+        gestureBuffer = [];
     }
 });
 
@@ -123,17 +119,19 @@ const camera = new Camera(videoElement, {
 // 3. ゲームロジック
 // ==========================================
 function executeGame(userHand, source) {
-    // 1. 状態をロック（音声・画像の二重判定を防止）
+    // 1. 状態をロック
     isWaitingForInput = false;
-    if (recognition) recognition.stop(); // 音声認識を一旦停止
-    gestureBuffer = []; // バッファクリア
+    if (recognition) recognition.stop();
+    gestureBuffer = [];
 
     // 2. PCの手を決定
     const pcHand = HAND_TYPES[Math.floor(Math.random() * HAND_TYPES.length)];
 
     // 3. 勝敗判定
+    const isAiko = (userHand === pcHand); // あいこかどうかを判定
     let resultMessage = "";
-    if (userHand === pcHand) {
+
+    if (isAiko) {
         resultMessage = "あいこ！";
     } else if (
         (userHand === 'グー' && pcHand === 'チョキ') ||
@@ -146,25 +144,40 @@ function executeGame(userHand, source) {
     }
 
     // 4. UI更新
-    statusText.innerText = "結果発表！";
+    statusText.innerText = isAiko ? "あいこで..." : "結果発表！";
     cameraStatus.innerText = "判定完了";
     inputSourceDisplay.innerText = source;
     userHandDisplay.innerText = HAND_EMOJIS[userHand];
     pcHandDisplay.innerText = HAND_EMOJIS[pcHand];
     resultText.innerText = resultMessage;
 
-    // 5. 次のゲームへの導線
-    resetBtn.style.display = 'inline-block';
+    // 5. 次のゲームへの導線（ここを変更！）
+    if (isAiko) {
+        // あいこの場合は1.5秒だけ結果を見せてから、自動で再スタート
+        setTimeout(() => {
+            resetGame(true); // あいこフラグを立ててリセット
+        }, 1500); 
+    } else {
+        // 勝敗がついた時だけ「もう一度」ボタンを表示
+        resetBtn.style.display = 'inline-block';
+    }
 }
 
-function resetGame() {
+// resetGame関数に「あいこからの再開か」を判定する引数(isAiko)を追加
+function resetGame(isAiko = false) {
     userHandDisplay.innerText = '❔';
     pcHandDisplay.innerText = '❔';
     resultText.innerText = '';
     inputSourceDisplay.innerText = '-';
     resetBtn.style.display = 'none';
     
-    statusText.innerText = "音声で「グー・チョキ・パー」と言うか、カメラに手を見せてください";
+    // あいこからの再開なら専用のテキストを表示
+    if (isAiko) {
+        statusText.innerText = "しょ！（カメラかマイクで手を出してください）";
+    } else {
+        statusText.innerText = "音声で「グー・チョキ・パー」と言うか、カメラに手を見せてください";
+    }
+    
     cameraStatus.innerText = "監視中...";
     
     isWaitingForInput = true;
@@ -178,14 +191,13 @@ startBtn.addEventListener('click', () => {
     startBtn.style.display = 'none';
     statusText.innerText = "カメラとマイクを起動しています...";
     
-    // カメラの起動
     camera.start().then(() => {
         gameArea.style.display = 'block';
-        resetGame(); // 待機状態に移行
+        resetGame();
     }).catch(err => {
         console.error(err);
         statusText.innerText = "カメラの起動に失敗しました。権限を確認してください。";
     });
 });
 
-resetBtn.addEventListener('click', resetGame);
+resetBtn.addEventListener('click', () => resetGame(false));
