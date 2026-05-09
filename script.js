@@ -11,11 +11,18 @@ const resultText = document.getElementById('result-text');
 const inputSourceDisplay = document.getElementById('input-source');
 
 // --- 状態管理 ---
-let isWaitingForInput = false; // 入力受付中かどうか
-let gestureBuffer = [];        // 画像認識のスムージング用バッファ
-const BUFFER_THRESHOLD = 12;   // 約0.4秒の連続一致で確定 (30fps想定)
+let isWaitingForInput = false;
+let gestureBuffer = [];
+const BUFFER_THRESHOLD = 5; 
 const HAND_TYPES = ['グー', 'チョキ', 'パー'];
 const HAND_EMOJIS = { 'グー': '✊', 'チョキ': '✌️', 'パー': '✋' };
+
+// 【追加】音声認識の「表記ゆれ」をすべて吸収するための最強辞書
+const VOICE_DICTIONARY = {
+    'グー': ['グー', 'ぐー', 'グウ', 'ぐう', 'グ', 'ぐ'],
+    'チョキ': ['チョキ', 'ちょき', 'チョ', 'ちょ', 'チキ', 'ちき'],
+    'パー': ['パー', 'ぱー', 'パア', 'ぱあ', 'パ', 'ぱ']
+};
 
 // ==========================================
 // 1. 音声認識 (Web Speech API) のセットアップ
@@ -26,29 +33,40 @@ let recognition = null;
 if (SpeechRecognition) {
     recognition = new SpeechRecognition();
     recognition.continuous = true;
-    recognition.interimResults = true;
+    recognition.interimResults = true; // 途中結果でもガンガン拾う
     recognition.lang = 'ja-JP';
 
     recognition.onresult = (event) => {
-        if (!isWaitingForInput) return; // 判定済みなら無視
+        if (!isWaitingForInput) return;
 
         for (let i = event.resultIndex; i < event.results.length; ++i) {
+            // スマホが認識した生のテキストを取得
             const transcript = event.results[i][0].transcript;
             
-            // 発話の中にじゃんけんの手が含まれているかチェック
-            for (const hand of HAND_TYPES) {
-                if (transcript.includes(hand)) {
-                    executeGame(hand, '音声');
-                    return; // 先勝ちで処理終了
+            // 辞書と照らし合わせて、どれかに引っかかれば即確定！
+            for (const [hand, words] of Object.entries(VOICE_DICTIONARY)) {
+                for (const word of words) {
+                    if (transcript.includes(word)) {
+                        executeGame(hand, '音声');
+                        return; // 処理終了
+                    }
                 }
             }
         }
     };
 
     recognition.onend = () => {
-        // 待機中であれば自動再起動
         if (isWaitingForInput) recognition.start();
     };
+    
+    // エラーが起きた時も止まらずに再起動させる
+    recognition.onerror = (event) => {
+        console.warn("音声認識エラー:", event.error);
+        if (isWaitingForInput && event.error !== 'not-allowed') {
+            setTimeout(() => recognition.start(), 1000);
+        }
+    };
+
 } else {
     console.warn("このブラウザはWeb Speech APIをサポートしていません。");
 }
@@ -61,12 +79,11 @@ const hands = new Hands({
 });
 hands.setOptions({
     maxNumHands: 1,
-    modelComplexity: 1,
-    minDetectionConfidence: 0.6,
+    modelComplexity: 0, 
+    minDetectionConfidence: 0.5, 
     minTrackingConfidence: 0.5
 });
 
-// 手の形状判定ロジック
 function detectHandGesture(landmarks) {
     const isFingerOpen = (tipIndex, baseIndex) => landmarks[tipIndex].y < landmarks[baseIndex].y;
 
@@ -111,24 +128,20 @@ const camera = new Camera(videoElement, {
     onFrame: async () => {
         await hands.send({image: videoElement});
     },
-    width: 640,
-    height: 480
+    width: 320, 
+    height: 240
 });
 
 // ==========================================
 // 3. ゲームロジック
 // ==========================================
 function executeGame(userHand, source) {
-    // 1. 状態をロック
     isWaitingForInput = false;
     if (recognition) recognition.stop();
     gestureBuffer = [];
 
-    // 2. PCの手を決定
     const pcHand = HAND_TYPES[Math.floor(Math.random() * HAND_TYPES.length)];
-
-    // 3. 勝敗判定
-    const isAiko = (userHand === pcHand); // あいこかどうかを判定
+    const isAiko = (userHand === pcHand);
     let resultMessage = "";
 
     if (isAiko) {
@@ -143,7 +156,6 @@ function executeGame(userHand, source) {
         resultMessage = "PCの勝ち！💻";
     }
 
-    // 4. UI更新
     statusText.innerText = isAiko ? "あいこで..." : "結果発表！";
     cameraStatus.innerText = "判定完了";
     inputSourceDisplay.innerText = source;
@@ -151,19 +163,15 @@ function executeGame(userHand, source) {
     pcHandDisplay.innerText = HAND_EMOJIS[pcHand];
     resultText.innerText = resultMessage;
 
-    // 5. 次のゲームへの導線（ここを変更！）
     if (isAiko) {
-        // あいこの場合は1.5秒だけ結果を見せてから、自動で再スタート
         setTimeout(() => {
-            resetGame(true); // あいこフラグを立ててリセット
+            resetGame(true);
         }, 1500); 
     } else {
-        // 勝敗がついた時だけ「もう一度」ボタンを表示
         resetBtn.style.display = 'inline-block';
     }
 }
 
-// resetGame関数に「あいこからの再開か」を判定する引数(isAiko)を追加
 function resetGame(isAiko = false) {
     userHandDisplay.innerText = '❔';
     pcHandDisplay.innerText = '❔';
@@ -171,7 +179,6 @@ function resetGame(isAiko = false) {
     inputSourceDisplay.innerText = '-';
     resetBtn.style.display = 'none';
     
-    // あいこからの再開なら専用のテキストを表示
     if (isAiko) {
         statusText.innerText = "しょ！（カメラかマイクで手を出してください）";
     } else {
@@ -181,7 +188,12 @@ function resetGame(isAiko = false) {
     cameraStatus.innerText = "監視中...";
     
     isWaitingForInput = true;
-    if (recognition) recognition.start();
+    // スマホでマイクが寝てしまうのを防ぐため、少し遅らせて確実につける
+    if (recognition) {
+        setTimeout(() => {
+            try { recognition.start(); } catch(e) {}
+        }, 100);
+    }
 }
 
 // ==========================================
