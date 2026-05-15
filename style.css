@@ -104,3 +104,36 @@ button:hover {
 .pop-anim {
     animation: popBounce 0.5s cubic-bezier(0.25, 1.5, 0.5, 1) forwards;
 }
+/* --- ★新規追加: HPバーのデザイン --- */
+.hp-board {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    width: 100%;
+    max-width: 400px;
+    margin-left: auto;
+    margin-right: auto;
+}
+.hp-container {
+    width: 45%;
+}
+.hp-label {
+    font-weight: bold;
+    margin-bottom: 5px;
+    font-size: 14px;
+    color: #333;
+    text-align: left;
+}
+.hp-bar-bg {
+    background-color: #ddd;
+    height: 20px;
+    border-radius: 10px;
+    overflow: hidden;
+    border: 2px solid #555;
+}
+.hp-bar-fill {
+    background-color: #4CAF50; /* 緑色 */
+    height: 100%;
+    width: 100%;
+    transition: width 0.3s ease, background-color 0.3s ease;
+}

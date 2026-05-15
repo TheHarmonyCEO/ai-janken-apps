@@ -10,12 +10,24 @@ const pcHandDisplay = document.getElementById('pc-hand-display');
 const resultText = document.getElementById('result-text');
 const inputSourceDisplay = document.getElementById('input-source');
 
+// HP関連の要素
+const playerHpBar = document.getElementById('player-hp-bar');
+const pcHpBar = document.getElementById('pc-hp-bar');
+const playerHpText = document.getElementById('player-hp-text');
+const pcHpText = document.getElementById('pc-hp-text');
+
 // --- 状態管理 ---
 let isWaitingForInput = false;
 let gestureBuffer = [];
 const BUFFER_THRESHOLD = 5; 
 const HAND_TYPES = ['グー', 'チョキ', 'パー'];
 const HAND_EMOJIS = { 'グー': '✊', 'チョキ': '✌️', 'パー': '✋' };
+
+// ★新規追加: HPの管理
+let maxHP = 100;
+let playerHP = maxHP;
+let pcHP = maxHP;
+const DAMAGE = 34; // 1回負けると34ダメージ（3回負けるとHPが0になる）
 
 const VOICE_DICTIONARY = {
     'グー': ['グー', 'ぐー', 'グウ', 'ぐう', 'ブー', 'ぶー', 'クー', 'くー', 'プー', 'ぷー', 'ルー', 'るー', '空', '食う', '喰う', 'goo', 'Goo'],
@@ -24,7 +36,21 @@ const VOICE_DICTIONARY = {
 };
 
 // ==========================================
-// 🎵 電子音(SE)を鳴らす機能
+// HPバーの画面を更新する機能
+// ==========================================
+function updateHPUI() {
+    playerHpBar.style.width = playerHP + '%';
+    pcHpBar.style.width = pcHP + '%';
+    playerHpText.innerText = playerHP;
+    pcHpText.innerText = pcHP;
+
+    // HPが30以下になったらピンチ（赤色）にする演出
+    playerHpBar.style.backgroundColor = playerHP <= 30 ? '#f44336' : '#4CAF50';
+    pcHpBar.style.backgroundColor = pcHP <= 30 ? '#f44336' : '#4CAF50';
+}
+
+// ==========================================
+// 電子音(SE)を鳴らす機能
 // ==========================================
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
@@ -67,7 +93,7 @@ function playSE(type) {
 }
 
 // ==========================================
-// 🗣 PCに喋らせる(音声合成)機能
+// PCに喋らせる(音声合成)機能
 // ==========================================
 function speak(text) {
     const synth = window.speechSynthesis;
@@ -81,7 +107,7 @@ function speak(text) {
 }
 
 // ==========================================
-// 1. 音声認識 (Web Speech API) のセットアップ
+// 1. 音声認識 (Web Speech API) 
 // ==========================================
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 let recognition = null;
@@ -118,13 +144,12 @@ if (SpeechRecognition) {
             setTimeout(() => recognition.start(), 1000);
         }
     };
-
 } else {
     alert("お使いのブラウザは音声認識に対応していません。iPhoneならSafari、AndroidならChromeをお使いください！");
 }
 
 // ==========================================
-// 2. 画像認識 (MediaPipe Hands) のセットアップ
+// 2. 画像認識 (MediaPipe Hands) 
 // ==========================================
 const hands = new Hands({
     locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
@@ -208,17 +233,26 @@ function executeGame(userHand, source) {
         playSE('win');
         speak(pcHand + "。あなたの勝ち！");
         
-        confetti({
-            particleCount: 150,
-            spread: 80,
-            origin: { y: 0.6 }
-        });
+        // ★PCにダメージを与える！
+        pcHP -= DAMAGE;
+        if (pcHP < 0) pcHP = 0;
+        
+        if (pcHP > 0) { // まだHPが残っていれば普通の紙吹雪
+            confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } });
+        }
 
     } else {
         resultMessage = "PCの勝ち！💻";
         playSE('lose');
         speak(pcHand + "。わたしの勝ち！");
+        
+        // ★あなたにダメージ！
+        playerHP -= DAMAGE;
+        if (playerHP < 0) playerHP = 0;
     }
+
+    // ★HPバーの表示を更新する
+    updateHPUI();
 
     statusText.innerText = isAiko ? "あいこで..." : "結果発表！";
     cameraStatus.innerText = "判定完了";
@@ -227,11 +261,9 @@ function executeGame(userHand, source) {
     pcHandDisplay.innerText = HAND_EMOJIS[pcHand];
     resultText.innerText = resultMessage;
 
-    // ★新規追加: 絵文字のアニメーションを起動！
-    // (一度アニメーションを消して、魔法の1行を挟んですぐにつけ直すことで毎回動かします)
     userHandDisplay.classList.remove('pop-anim');
     pcHandDisplay.classList.remove('pop-anim');
-    void userHandDisplay.offsetWidth; // 魔法のリフレッシュ処理
+    void userHandDisplay.offsetWidth; 
     userHandDisplay.classList.add('pop-anim');
     pcHandDisplay.classList.add('pop-anim');
 
@@ -240,18 +272,38 @@ function executeGame(userHand, source) {
             resetGame(true);
         }, 1500); 
     } else {
+        // ★決着がついたかどうか（HPが0になったか）の判定
+        if (playerHP === 0 || pcHP === 0) {
+            let isPlayerKO = playerHP === 0;
+            statusText.innerText = "K.O. 決着！！";
+            resultText.innerText = isPlayerKO ? "GAME OVER...😭" : "完全勝利！！🏆";
+            
+            if (!isPlayerKO) { // 完全勝利ならド派手な紙吹雪！
+                confetti({ particleCount: 300, spread: 100, origin: { y: 0.5 } });
+            }
+            speak(isPlayerKO ? "ゲームオーバー" : "かんぜんしょうり");
+            resetBtn.innerText = "最初からやり直す";
+        } else {
+            resetBtn.innerText = "次のラウンドへ";
+        }
         resetBtn.style.display = 'inline-block';
     }
 }
 
 function resetGame(isAiko = false) {
+    // ★HPが0になっていたら、HPを満タンに復活させる
+    if (playerHP === 0 || pcHP === 0) {
+        playerHP = maxHP;
+        pcHP = maxHP;
+        updateHPUI();
+    }
+
     userHandDisplay.innerText = '❔';
     pcHandDisplay.innerText = '❔';
     resultText.innerText = '';
     inputSourceDisplay.innerText = '-';
     resetBtn.style.display = 'none';
     
-    // 「❔」の時にもポンッと出ます
     userHandDisplay.classList.remove('pop-anim');
     pcHandDisplay.classList.remove('pop-anim');
     void userHandDisplay.offsetWidth;
