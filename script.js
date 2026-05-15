@@ -208,11 +208,10 @@ function executeGame(userHand, source) {
         playSE('win');
         speak(pcHand + "。あなたの勝ち！");
         
-        // ★新規追加: 勝った時に紙吹雪を舞わせる！
         confetti({
-            particleCount: 150,  // 紙吹雪の数
-            spread: 80,          // 広がる角度
-            origin: { y: 0.6 }   // 画面の少し下から噴射
+            particleCount: 150,
+            spread: 80,
+            origin: { y: 0.6 }
         });
 
     } else {
@@ -227,6 +226,14 @@ function executeGame(userHand, source) {
     userHandDisplay.innerText = HAND_EMOJIS[userHand];
     pcHandDisplay.innerText = HAND_EMOJIS[pcHand];
     resultText.innerText = resultMessage;
+
+    // ★新規追加: 絵文字のアニメーションを起動！
+    // (一度アニメーションを消して、魔法の1行を挟んですぐにつけ直すことで毎回動かします)
+    userHandDisplay.classList.remove('pop-anim');
+    pcHandDisplay.classList.remove('pop-anim');
+    void userHandDisplay.offsetWidth; // 魔法のリフレッシュ処理
+    userHandDisplay.classList.add('pop-anim');
+    pcHandDisplay.classList.add('pop-anim');
 
     if (isAiko) {
         setTimeout(() => {
@@ -243,6 +250,13 @@ function resetGame(isAiko = false) {
     resultText.innerText = '';
     inputSourceDisplay.innerText = '-';
     resetBtn.style.display = 'none';
+    
+    // 「❔」の時にもポンッと出ます
+    userHandDisplay.classList.remove('pop-anim');
+    pcHandDisplay.classList.remove('pop-anim');
+    void userHandDisplay.offsetWidth;
+    userHandDisplay.classList.add('pop-anim');
+    pcHandDisplay.classList.add('pop-anim');
     
     if (isAiko) {
         statusText.innerText = "しょ！（声か手を出してください）";
