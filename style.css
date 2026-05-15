@@ -137,3 +137,22 @@ button:hover {
     width: 100%;
     transition: width 0.3s ease, background-color 0.3s ease;
 }
+/* --- ★新規追加: 連勝カウンターのデザイン --- */
+.streak-container {
+    background-color: #ff9800;
+    color: white;
+    padding: 5px 15px;
+    border-radius: 20px;
+    font-weight: bold;
+    display: inline-block;
+    margin-bottom: 10px;
+    box-shadow: 0 4px 0 #e68a00;
+    font-size: 14px;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}

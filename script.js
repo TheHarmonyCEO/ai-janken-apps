@@ -10,11 +10,13 @@ const pcHandDisplay = document.getElementById('pc-hand-display');
 const resultText = document.getElementById('result-text');
 const inputSourceDisplay = document.getElementById('input-source');
 
-// HP関連の要素
+// HP・連勝関連の要素
 const playerHpBar = document.getElementById('player-hp-bar');
 const pcHpBar = document.getElementById('pc-hp-bar');
 const playerHpText = document.getElementById('player-hp-text');
 const pcHpText = document.getElementById('pc-hp-text');
+const streakDisplay = document.getElementById('streak-display');
+const winStreakCountText = document.getElementById('win-streak-count');
 
 // --- 状態管理 ---
 let isWaitingForInput = false;
@@ -23,11 +25,13 @@ const BUFFER_THRESHOLD = 5;
 const HAND_TYPES = ['グー', 'チョキ', 'パー'];
 const HAND_EMOJIS = { 'グー': '✊', 'チョキ': '✌️', 'パー': '✋' };
 
-// ★新規追加: HPの管理
 let maxHP = 100;
 let playerHP = maxHP;
 let pcHP = maxHP;
-const DAMAGE = 34; // 1回負けると34ダメージ（3回負けるとHPが0になる）
+const DAMAGE = 34;
+
+// ★新規追加: 連勝カウンターの変数
+let winStreak = 0;
 
 const VOICE_DICTIONARY = {
     'グー': ['グー', 'ぐー', 'グウ', 'ぐう', 'ブー', 'ぶー', 'クー', 'くー', 'プー', 'ぷー', 'ルー', 'るー', '空', '食う', '喰う', 'goo', 'Goo'],
@@ -36,33 +40,28 @@ const VOICE_DICTIONARY = {
 };
 
 // ==========================================
-// HPバーの画面を更新する機能
+// HPバーの画面を更新
 // ==========================================
 function updateHPUI() {
     playerHpBar.style.width = playerHP + '%';
     pcHpBar.style.width = pcHP + '%';
     playerHpText.innerText = playerHP;
     pcHpText.innerText = pcHP;
-
-    // HPが30以下になったらピンチ（赤色）にする演出
     playerHpBar.style.backgroundColor = playerHP <= 30 ? '#f44336' : '#4CAF50';
     pcHpBar.style.backgroundColor = pcHP <= 30 ? '#f44336' : '#4CAF50';
 }
 
 // ==========================================
-// 電子音(SE)を鳴らす機能
+// 電子音(SE)を鳴らす
 // ==========================================
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-
 function playSE(type) {
     if (audioCtx.state === 'suspended') audioCtx.resume();
-
     const osc = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
     osc.connect(gain);
     gain.connect(audioCtx.destination);
     const now = audioCtx.currentTime;
-
     if (type === 'win') {
         osc.type = 'sine';
         osc.frequency.setValueAtTime(523.25, now);
@@ -93,12 +92,11 @@ function playSE(type) {
 }
 
 // ==========================================
-// PCに喋らせる(音声合成)機能
+// PCに喋らせる(音声合成)
 // ==========================================
 function speak(text) {
     const synth = window.speechSynthesis;
     if (!synth) return;
-    
     synth.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = 'ja-JP';
@@ -111,16 +109,13 @@ function speak(text) {
 // ==========================================
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 let recognition = null;
-
 if (SpeechRecognition) {
     recognition = new SpeechRecognition();
     recognition.continuous = true;
     recognition.interimResults = true;
     recognition.lang = 'ja-JP';
-
     recognition.onresult = (event) => {
         if (!isWaitingForInput) return;
-
         for (let i = event.resultIndex; i < event.results.length; ++i) {
             const transcript = event.results[i][0].transcript;
             for (const [hand, words] of Object.entries(VOICE_DICTIONARY)) {
@@ -133,80 +128,40 @@ if (SpeechRecognition) {
             }
         }
     };
-
-    recognition.onend = () => {
-        if (isWaitingForInput) recognition.start();
-    };
-    
+    recognition.onend = () => { if (isWaitingForInput) recognition.start(); };
     recognition.onerror = (event) => {
-        console.warn("音声認識エラー:", event.error);
-        if (isWaitingForInput && event.error !== 'not-allowed') {
-            setTimeout(() => recognition.start(), 1000);
-        }
+        if (isWaitingForInput && event.error !== 'not-allowed') setTimeout(() => recognition.start(), 1000);
     };
-} else {
-    alert("お使いのブラウザは音声認識に対応していません。iPhoneならSafari、AndroidならChromeをお使いください！");
 }
 
 // ==========================================
 // 2. 画像認識 (MediaPipe Hands) 
 // ==========================================
-const hands = new Hands({
-    locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
-});
-hands.setOptions({
-    maxNumHands: 1,
-    modelComplexity: 0, 
-    minDetectionConfidence: 0.5, 
-    minTrackingConfidence: 0.5
-});
-
+const hands = new Hands({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}` });
+hands.setOptions({ maxNumHands: 1, modelComplexity: 0, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
 function detectHandGesture(landmarks) {
     const isFingerOpen = (tipIndex, baseIndex) => landmarks[tipIndex].y < landmarks[baseIndex].y;
     const indexOpen = isFingerOpen(8, 5);
     const middleOpen = isFingerOpen(12, 9);
     const ringOpen = isFingerOpen(16, 13);
     const pinkyOpen = isFingerOpen(20, 17);
-
     if (!indexOpen && !middleOpen && !ringOpen && !pinkyOpen) return 'グー';
     if (indexOpen && middleOpen && !ringOpen && !pinkyOpen) return 'チョキ';
     if (indexOpen && middleOpen && ringOpen && pinkyOpen) return 'パー';
     return null;
 }
-
 hands.onResults((results) => {
     if (!isWaitingForInput) return;
-
     if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
         const gesture = detectHandGesture(results.multiHandLandmarks[0]);
-        
         if (gesture) {
             gestureBuffer.push(gesture);
-            if (gestureBuffer.length > BUFFER_THRESHOLD) {
-                gestureBuffer.shift();
-            }
-
-            const isStable = gestureBuffer.length === BUFFER_THRESHOLD && 
-                             gestureBuffer.every(val => val === gesture);
-
-            if (isStable) {
-                executeGame(gesture, 'カメラ');
-            }
-        } else {
-            gestureBuffer = [];
-        }
-    } else {
-        gestureBuffer = [];
-    }
+            if (gestureBuffer.length > BUFFER_THRESHOLD) gestureBuffer.shift();
+            if (gestureBuffer.length === BUFFER_THRESHOLD && gestureBuffer.every(val => val === gesture)) executeGame(gesture, 'カメラ');
+        } else { gestureBuffer = []; }
+    } else { gestureBuffer = []; }
 });
-
-const camera = new Camera(videoElement, {
-    onFrame: async () => {
-        await hands.send({image: videoElement});
-    },
-    width: 320, 
-    height: 240
-});
+const camera = new Camera(videoElement, { onFrame: async () => { await hands.send({image: videoElement}); }, width: 320, height: 240 });
 
 // ==========================================
 // 3. ゲームロジック
@@ -215,7 +170,6 @@ function executeGame(userHand, source) {
     isWaitingForInput = false;
     if (recognition) recognition.stop();
     gestureBuffer = [];
-
     const pcHand = HAND_TYPES[Math.floor(Math.random() * HAND_TYPES.length)];
     const isAiko = (userHand === pcHand);
     let resultMessage = "";
@@ -232,28 +186,18 @@ function executeGame(userHand, source) {
         resultMessage = "あなたの勝ち！🎉";
         playSE('win');
         speak(pcHand + "。あなたの勝ち！");
-        
-        // ★PCにダメージを与える！
         pcHP -= DAMAGE;
         if (pcHP < 0) pcHP = 0;
-        
-        if (pcHP > 0) { // まだHPが残っていれば普通の紙吹雪
-            confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } });
-        }
-
+        if (pcHP > 0) confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } });
     } else {
         resultMessage = "PCの勝ち！💻";
         playSE('lose');
         speak(pcHand + "。わたしの勝ち！");
-        
-        // ★あなたにダメージ！
         playerHP -= DAMAGE;
         if (playerHP < 0) playerHP = 0;
     }
 
-    // ★HPバーの表示を更新する
     updateHPUI();
-
     statusText.innerText = isAiko ? "あいこで..." : "結果発表！";
     cameraStatus.innerText = "判定完了";
     inputSourceDisplay.innerText = source;
@@ -268,20 +212,35 @@ function executeGame(userHand, source) {
     pcHandDisplay.classList.add('pop-anim');
 
     if (isAiko) {
-        setTimeout(() => {
-            resetGame(true);
-        }, 1500); 
+        setTimeout(() => { resetGame(true); }, 1500); 
     } else {
-        // ★決着がついたかどうか（HPが0になったか）の判定
         if (playerHP === 0 || pcHP === 0) {
             let isPlayerKO = playerHP === 0;
             statusText.innerText = "K.O. 決着！！";
-            resultText.innerText = isPlayerKO ? "GAME OVER...😭" : "完全勝利！！🏆";
             
-            if (!isPlayerKO) { // 完全勝利ならド派手な紙吹雪！
+            if (isPlayerKO) {
+                // あなたが負けた：連勝ストップ
+                resultText.innerText = "GAME OVER...😭";
+                speak("ゲームオーバー。また挑戦してね。");
+                winStreak = 0; // 連勝リセット
+            } else {
+                // あなたが勝った：連勝加算
+                winStreak++;
+                resultText.innerText = winStreak + "連勝達成！！🏆";
                 confetti({ particleCount: 300, spread: 100, origin: { y: 0.5 } });
+                
+                // 連勝数に応じたセリフ
+                if (winStreak >= 5) {
+                    speak("すごすぎる！" + winStreak + "連勝！もう敵いません！");
+                } else {
+                    speak("かんぜんしょうり！" + winStreak + "連勝中！");
+                }
             }
-            speak(isPlayerKO ? "ゲームオーバー" : "かんぜんしょうり");
+            
+            // 連勝カウンターを表示・更新
+            streakDisplay.style.display = winStreak > 0 ? 'inline-block' : 'none';
+            winStreakCountText.innerText = winStreak;
+            
             resetBtn.innerText = "最初からやり直す";
         } else {
             resetBtn.innerText = "次のラウンドへ";
@@ -291,66 +250,41 @@ function executeGame(userHand, source) {
 }
 
 function resetGame(isAiko = false) {
-    // ★HPが0になっていたら、HPを満タンに復活させる
     if (playerHP === 0 || pcHP === 0) {
         playerHP = maxHP;
         pcHP = maxHP;
         updateHPUI();
     }
-
     userHandDisplay.innerText = '❔';
     pcHandDisplay.innerText = '❔';
     resultText.innerText = '';
     inputSourceDisplay.innerText = '-';
     resetBtn.style.display = 'none';
-    
     userHandDisplay.classList.remove('pop-anim');
     pcHandDisplay.classList.remove('pop-anim');
     void userHandDisplay.offsetWidth;
     userHandDisplay.classList.add('pop-anim');
     pcHandDisplay.classList.add('pop-anim');
-    
     if (isAiko) {
         statusText.innerText = "しょ！（声か手を出してください）";
         speak("しょ！"); 
     } else {
         statusText.innerText = "音声で「グー・チョキ・パー」と言うか、カメラに手を見せてください";
     }
-    
     cameraStatus.innerText = "監視中...";
-    
     isWaitingForInput = true;
-    if (recognition) {
-        setTimeout(() => {
-            try { recognition.start(); } catch(e) {}
-        }, 100);
-    }
+    if (recognition) { setTimeout(() => { try { recognition.start(); } catch(e) {} }, 100); }
 }
 
-// ==========================================
-// 4. 初期化・イベントリスナー
-// ==========================================
 startBtn.addEventListener('click', () => {
     startBtn.style.display = 'none';
     statusText.innerText = "カメラとマイクを起動しています...";
-    
     if (audioCtx.state === 'suspended') audioCtx.resume();
-    if (recognition) {
-        try { recognition.start(); } catch(e) {}
-    }
-    
-    if (window.speechSynthesis) {
-        window.speechSynthesis.speak(new SpeechSynthesisUtterance(''));
-    }
-    
-    camera.start().then(() => {
-        gameArea.style.display = 'block';
-        resetGame();
-    }).catch(err => {
+    if (recognition) { try { recognition.start(); } catch(e) {} }
+    if (window.speechSynthesis) { window.speechSynthesis.speak(new SpeechSynthesisUtterance('')); }
+    camera.start().then(() => { gameArea.style.display = 'block'; resetGame(); }).catch(err => {
         alert("【カメラ起動エラー】 " + err);
-        console.error(err);
-        statusText.innerText = "カメラの起動に失敗しました。設定からカメラの権限を確認してください。";
+        statusText.innerText = "カメラの起動に失敗しました。";
     });
 });
-
 resetBtn.addEventListener('click', () => resetGame(false));
