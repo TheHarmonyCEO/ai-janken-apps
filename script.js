@@ -10,7 +10,6 @@ const pcHandDisplay = document.getElementById('pc-hand-display');
 const resultText = document.getElementById('result-text');
 const inputSourceDisplay = document.getElementById('input-source');
 
-// HP・連勝関連の要素
 const playerHpBar = document.getElementById('player-hp-bar');
 const pcHpBar = document.getElementById('pc-hp-bar');
 const playerHpText = document.getElementById('player-hp-text');
@@ -29,9 +28,22 @@ let maxHP = 100;
 let playerHP = maxHP;
 let pcHP = maxHP;
 const DAMAGE = 34;
-
-// ★新規追加: 連勝カウンターの変数
 let winStreak = 0;
+
+// ★新規追加: 難易度の管理
+let difficulty = 'normal';
+
+function setDifficulty(mode) {
+    difficulty = mode;
+    // ボタンの見た目を更新
+    const btns = document.querySelectorAll('.mode-btn');
+    btns.forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.innerText.includes('接待') && mode === 'hospitality') btn.classList.add('active');
+        if (btn.innerText === 'ふつう' && mode === 'normal') btn.classList.add('active');
+        if (btn.innerText.includes('鬼') && mode === 'oni') btn.classList.add('active');
+    });
+}
 
 const VOICE_DICTIONARY = {
     'グー': ['グー', 'ぐー', 'グウ', 'ぐう', 'ブー', 'ぶー', 'クー', 'くー', 'プー', 'ぷー', 'ルー', 'るー', '空', '食う', '喰う', 'goo', 'Goo'],
@@ -52,7 +64,7 @@ function updateHPUI() {
 }
 
 // ==========================================
-// 電子音(SE)を鳴らす
+// 電子音(SE)
 // ==========================================
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 function playSE(type) {
@@ -92,7 +104,7 @@ function playSE(type) {
 }
 
 // ==========================================
-// PCに喋らせる(音声合成)
+// 音声合成
 // ==========================================
 function speak(text) {
     const synth = window.speechSynthesis;
@@ -105,7 +117,7 @@ function speak(text) {
 }
 
 // ==========================================
-// 1. 音声認識 (Web Speech API) 
+// 音声認識 & 画像認識 (省略・変更なし)
 // ==========================================
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 let recognition = null;
@@ -120,23 +132,15 @@ if (SpeechRecognition) {
             const transcript = event.results[i][0].transcript;
             for (const [hand, words] of Object.entries(VOICE_DICTIONARY)) {
                 for (const word of words) {
-                    if (transcript.includes(word)) {
-                        executeGame(hand, '音声');
-                        return; 
-                    }
+                    if (transcript.includes(word)) { executeGame(hand, '音声'); return; }
                 }
             }
         }
     };
     recognition.onend = () => { if (isWaitingForInput) recognition.start(); };
-    recognition.onerror = (event) => {
-        if (isWaitingForInput && event.error !== 'not-allowed') setTimeout(() => recognition.start(), 1000);
-    };
+    recognition.onerror = (event) => { if (isWaitingForInput && event.error !== 'not-allowed') setTimeout(() => recognition.start(), 1000); };
 }
 
-// ==========================================
-// 2. 画像認識 (MediaPipe Hands) 
-// ==========================================
 const hands = new Hands({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}` });
 hands.setOptions({ maxNumHands: 1, modelComplexity: 0, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
 function detectHandGesture(landmarks) {
@@ -164,13 +168,29 @@ hands.onResults((results) => {
 const camera = new Camera(videoElement, { onFrame: async () => { await hands.send({image: videoElement}); }, width: 320, height: 240 });
 
 // ==========================================
-// 3. ゲームロジック
+// 3. ゲームロジック (難易度対応)
 // ==========================================
 function executeGame(userHand, source) {
     isWaitingForInput = false;
     if (recognition) recognition.stop();
     gestureBuffer = [];
-    const pcHand = HAND_TYPES[Math.floor(Math.random() * HAND_TYPES.length)];
+
+    // ★難易度に応じたPCの手の決定
+    let pcHand;
+    if (difficulty === 'hospitality') {
+        // 接待モード：ユーザーに勝てる手を除外して選ぶ（わざと負ける）
+        const winAgainstUser = { 'グー': 'パー', 'チョキ': 'グー', 'パー': 'チョキ' };
+        const losingHands = HAND_TYPES.filter(h => h !== winAgainstUser[userHand]);
+        pcHand = losingHands[Math.floor(Math.random() * losingHands.length)];
+    } else if (difficulty === 'oni') {
+        // 鬼モード：絶対勝つ（後出し）
+        const winAgainstUser = { 'グー': 'パー', 'チョキ': 'グー', 'パー': 'チョキ' };
+        pcHand = winAgainstUser[userHand];
+    } else {
+        // ふつう：ランダム
+        pcHand = HAND_TYPES[Math.floor(Math.random() * HAND_TYPES.length)];
+    }
+
     const isAiko = (userHand === pcHand);
     let resultMessage = "";
 
@@ -217,31 +237,19 @@ function executeGame(userHand, source) {
         if (playerHP === 0 || pcHP === 0) {
             let isPlayerKO = playerHP === 0;
             statusText.innerText = "K.O. 決着！！";
-            
             if (isPlayerKO) {
-                // あなたが負けた：連勝ストップ
                 resultText.innerText = "GAME OVER...😭";
-                speak("ゲームオーバー。また挑戦してね。");
-                winStreak = 0; // 連勝リセット
+                speak(difficulty === 'oni' ? "当然の結果だね。さようなら。" : "ゲームオーバー。また遊んでね！");
+                winStreak = 0;
             } else {
-                // あなたが勝った：連勝加算
                 winStreak++;
                 resultText.innerText = winStreak + "連勝達成！！🏆";
                 confetti({ particleCount: 300, spread: 100, origin: { y: 0.5 } });
-                
-                // 連勝数に応じたセリフ
-                if (winStreak >= 5) {
-                    speak("すごすぎる！" + winStreak + "連勝！もう敵いません！");
-                } else {
-                    speak("かんぜんしょうり！" + winStreak + "連勝中！");
-                }
+                speak(difficulty === 'hospitality' ? "お見事です！わざと負けたわけじゃないですよ？" : "すごい！かんぜんしょうり！");
             }
-            
-            // 連勝カウンターを表示・更新
             streakDisplay.style.display = winStreak > 0 ? 'inline-block' : 'none';
             winStreakCountText.innerText = winStreak;
-            
-            resetBtn.innerText = "最初からやり直す";
+            resetBtn.innerText = "タイトルへ戻る";
         } else {
             resetBtn.innerText = "次のラウンドへ";
         }
@@ -251,26 +259,16 @@ function executeGame(userHand, source) {
 
 function resetGame(isAiko = false) {
     if (playerHP === 0 || pcHP === 0) {
-        playerHP = maxHP;
-        pcHP = maxHP;
-        updateHPUI();
+        playerHP = maxHP; pcHP = maxHP; updateHPUI();
+        document.getElementById('mode-area').style.display = 'block'; // モード選択を再表示
     }
-    userHandDisplay.innerText = '❔';
-    pcHandDisplay.innerText = '❔';
-    resultText.innerText = '';
-    inputSourceDisplay.innerText = '-';
+    userHandDisplay.innerText = '❔'; pcHandDisplay.innerText = '❔'; resultText.innerText = ''; inputSourceDisplay.innerText = '-';
     resetBtn.style.display = 'none';
-    userHandDisplay.classList.remove('pop-anim');
-    pcHandDisplay.classList.remove('pop-anim');
+    userHandDisplay.classList.remove('pop-anim'); pcHandDisplay.classList.remove('pop-anim');
     void userHandDisplay.offsetWidth;
-    userHandDisplay.classList.add('pop-anim');
-    pcHandDisplay.classList.add('pop-anim');
-    if (isAiko) {
-        statusText.innerText = "しょ！（声か手を出してください）";
-        speak("しょ！"); 
-    } else {
-        statusText.innerText = "音声で「グー・チョキ・パー」と言うか、カメラに手を見せてください";
-    }
+    userHandDisplay.classList.add('pop-anim'); pcHandDisplay.classList.add('pop-anim');
+    if (isAiko) { statusText.innerText = "しょ！（声か手を出してください）"; speak("しょ！"); 
+    } else { statusText.innerText = "音声かカメラで勝負してください！"; }
     cameraStatus.innerText = "監視中...";
     isWaitingForInput = true;
     if (recognition) { setTimeout(() => { try { recognition.start(); } catch(e) {} }, 100); }
@@ -278,12 +276,18 @@ function resetGame(isAiko = false) {
 
 startBtn.addEventListener('click', () => {
     startBtn.style.display = 'none';
+    document.getElementById('mode-area').style.display = 'none'; // ゲーム中はモード選択を隠す
     statusText.innerText = "カメラとマイクを起動しています...";
     if (audioCtx.state === 'suspended') audioCtx.resume();
     if (recognition) { try { recognition.start(); } catch(e) {} }
     if (window.speechSynthesis) { window.speechSynthesis.speak(new SpeechSynthesisUtterance('')); }
+    
+    // モードに応じた挨拶
+    if (difficulty === 'oni') speak("絶対に勝たせないよ。覚悟してね。");
+    else if (difficulty === 'hospitality') speak("どうぞ、お勝ちくださいませ。");
+
     camera.start().then(() => { gameArea.style.display = 'block'; resetGame(); }).catch(err => {
-        alert("【カメラ起動エラー】 " + err);
+        alert("起動エラー: " + err);
         statusText.innerText = "カメラの起動に失敗しました。";
     });
 });

@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AIじゃんけん - マルチモーダル入力</title>
+    <title>AIじゃんけん - 最終形態</title>
     
-    <link rel="stylesheet" href="style.css?v=5">
+    <link rel="stylesheet" href="style.css?v=6">
     
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
@@ -20,8 +20,14 @@
             現在 <span id="win-streak-count">0</span> 連勝中！
         </div>
 
-        <p id="status-text">「スタート」を押して、カメラまたはマイクへのアクセスを許可してください。</p>
+        <p id="status-text">難易度を選んで「スタート」を押してください！</p>
         
+        <div id="mode-area" class="mode-selection">
+            <button class="mode-btn" onclick="setDifficulty('hospitality')">🥂接待🥂</button>
+            <button class="mode-btn active" onclick="setDifficulty('normal')">ノーマル✊️✌️✋️</button>
+            <button class="mode-btn" onclick="setDifficulty('oni')">☠️絶望☠️</button>
+        </div>
+
         <button id="start-btn">ゲームスタート</button>
         
         <div class="game-area" id="game-area" style="display: none;">
@@ -58,6 +64,6 @@
         </div>
     </div>
     
-    <script src="script.js?v=7"></script>
+    <script src="script.js?v=8"></script>
 </body>
 </html>

@@ -156,3 +156,28 @@ button:hover {
     50% { transform: scale(1.05); }
     100% { transform: scale(1); }
 }
+/* --- ★新規追加: 難易度選択ボタンのデザイン --- */
+.mode-selection {
+    margin-bottom: 20px;
+}
+.mode-btn {
+    padding: 8px 15px;
+    margin: 0 5px;
+    border: 2px solid #ccc;
+    background: white;
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: 0.2s;
+}
+.mode-btn.active {
+    background: #4285f4;
+    color: white;
+    border-color: #4285f4;
+}
+.mode-btn:hover {
+    background: #f0f0f0;
+}
+.mode-btn.active:hover {
+    background: #3367d6;
+}
