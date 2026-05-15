@@ -67,18 +67,16 @@ function playSE(type) {
 }
 
 // ==========================================
-// ★新規追加: PCに喋らせる(音声合成)機能
+// 🗣 PCに喋らせる(音声合成)機能
 // ==========================================
 function speak(text) {
     const synth = window.speechSynthesis;
     if (!synth) return;
     
-    // もし前の言葉を喋っている途中なら、キャンセルして新しい言葉を喋る
     synth.cancel();
-    
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = 'ja-JP';
-    utterance.rate = 1.2; // じゃんけんのテンポに合うように少し早口にする
+    utterance.rate = 1.2;
     synth.speak(utterance);
 }
 
@@ -197,7 +195,6 @@ function executeGame(userHand, source) {
     const isAiko = (userHand === pcHand);
     let resultMessage = "";
 
-    // ★ここで勝敗に合わせて「音」と「声」を出します！
     if (isAiko) {
         resultMessage = "あいこ！";
         playSE('aiko');
@@ -210,6 +207,14 @@ function executeGame(userHand, source) {
         resultMessage = "あなたの勝ち！🎉";
         playSE('win');
         speak(pcHand + "。あなたの勝ち！");
+        
+        // ★新規追加: 勝った時に紙吹雪を舞わせる！
+        confetti({
+            particleCount: 150,  // 紙吹雪の数
+            spread: 80,          // 広がる角度
+            origin: { y: 0.6 }   // 画面の少し下から噴射
+        });
+
     } else {
         resultMessage = "PCの勝ち！💻";
         playSE('lose');
@@ -241,7 +246,7 @@ function resetGame(isAiko = false) {
     
     if (isAiko) {
         statusText.innerText = "しょ！（声か手を出してください）";
-        speak("しょ！"); // ★自動で再スタートする時に喋る
+        speak("しょ！"); 
     } else {
         statusText.innerText = "音声で「グー・チョキ・パー」と言うか、カメラに手を見せてください";
     }
@@ -268,7 +273,6 @@ startBtn.addEventListener('click', () => {
         try { recognition.start(); } catch(e) {}
     }
     
-    // ★スマホ向けに音声合成の制限を解除（空の音声を一度だけ再生しておく）
     if (window.speechSynthesis) {
         window.speechSynthesis.speak(new SpeechSynthesisUtterance(''));
     }

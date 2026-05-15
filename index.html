@@ -8,6 +8,8 @@
     
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 </head>
 <body>
     <div class="container">
@@ -15,13 +17,13 @@
         <p id="status-text">「スタート」を押して、カメラまたはマイクへのアクセスを許可してください。</p>
         
         <button id="start-btn">ゲームスタート</button>
-
+        
         <div class="game-area" id="game-area" style="display: none;">
             <div class="video-container">
                 <video class="input_video" autoplay playsinline></video>
                 <div class="overlay-text" id="camera-status">カメラ待機中...</div>
             </div>
-
+            
             <div class="result-board">
                 <div class="player-hand">
                     <h3>あなた (<span id="input-source">-</span>)</h3>
@@ -33,13 +35,12 @@
                     <div id="pc-hand-display" class="hand-icon">❔</div>
                 </div>
             </div>
-
-            <h2 id="result-text" class="result-text"></h2>
             
+            <h2 id="result-text" class="result-text"></h2>
             <button id="reset-btn" style="display: none;">もう一度</button>
         </div>
     </div>
-
-    <script src="script.js?v=3"></script>
+    
+    <script src="script.js?v=4"></script>
 </body>
 </html>
