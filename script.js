@@ -24,36 +24,30 @@ const VOICE_DICTIONARY = {
 };
 
 // ==========================================
-// ★新規追加: 電子音(SE)を鳴らす機能
+// 🎵 電子音(SE)を鳴らす機能
 // ==========================================
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
 function playSE(type) {
-    // スマホの制限を解除（ユーザーがボタンを押した後に音を許可する）
-    if (audioCtx.state === 'suspended') {
-        audioCtx.resume();
-    }
+    if (audioCtx.state === 'suspended') audioCtx.resume();
 
     const osc = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
     osc.connect(gain);
     gain.connect(audioCtx.destination);
-
     const now = audioCtx.currentTime;
 
     if (type === 'win') {
-        // 勝ち：ピロリン！（明るい和音のアルペジオ）
         osc.type = 'sine';
-        osc.frequency.setValueAtTime(523.25, now);        // ド
-        osc.frequency.setValueAtTime(659.25, now + 0.1);  // ミ
-        osc.frequency.setValueAtTime(783.99, now + 0.2);  // ソ
-        osc.frequency.setValueAtTime(1046.50, now + 0.3); // 高いド
+        osc.frequency.setValueAtTime(523.25, now);
+        osc.frequency.setValueAtTime(659.25, now + 0.1);
+        osc.frequency.setValueAtTime(783.99, now + 0.2);
+        osc.frequency.setValueAtTime(1046.50, now + 0.3);
         gain.gain.setValueAtTime(0.5, now);
         gain.gain.linearRampToValueAtTime(0, now + 0.5);
         osc.start(now);
         osc.stop(now + 0.5);
     } else if (type === 'lose') {
-        // 負け：ブーッ...（低く下がる音）
         osc.type = 'sawtooth';
         osc.frequency.setValueAtTime(150, now);
         osc.frequency.linearRampToValueAtTime(80, now + 0.5);
@@ -62,7 +56,6 @@ function playSE(type) {
         osc.start(now);
         osc.stop(now + 0.5);
     } else if (type === 'aiko') {
-        // あいこ：シュイッ！（素早く上がる音）
         osc.type = 'square';
         osc.frequency.setValueAtTime(400, now);
         osc.frequency.exponentialRampToValueAtTime(800, now + 0.1);
@@ -71,6 +64,22 @@ function playSE(type) {
         osc.start(now);
         osc.stop(now + 0.15);
     }
+}
+
+// ==========================================
+// ★新規追加: PCに喋らせる(音声合成)機能
+// ==========================================
+function speak(text) {
+    const synth = window.speechSynthesis;
+    if (!synth) return;
+    
+    // もし前の言葉を喋っている途中なら、キャンセルして新しい言葉を喋る
+    synth.cancel();
+    
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'ja-JP';
+    utterance.rate = 1.2; // じゃんけんのテンポに合うように少し早口にする
+    synth.speak(utterance);
 }
 
 // ==========================================
@@ -131,7 +140,6 @@ hands.setOptions({
 
 function detectHandGesture(landmarks) {
     const isFingerOpen = (tipIndex, baseIndex) => landmarks[tipIndex].y < landmarks[baseIndex].y;
-
     const indexOpen = isFingerOpen(8, 5);
     const middleOpen = isFingerOpen(12, 9);
     const ringOpen = isFingerOpen(16, 13);
@@ -189,10 +197,11 @@ function executeGame(userHand, source) {
     const isAiko = (userHand === pcHand);
     let resultMessage = "";
 
-    // ★ここで勝敗に合わせて音を鳴らします！
+    // ★ここで勝敗に合わせて「音」と「声」を出します！
     if (isAiko) {
         resultMessage = "あいこ！";
         playSE('aiko');
+        speak("あいこで");
     } else if (
         (userHand === 'グー' && pcHand === 'チョキ') ||
         (userHand === 'チョキ' && pcHand === 'パー') ||
@@ -200,9 +209,11 @@ function executeGame(userHand, source) {
     ) {
         resultMessage = "あなたの勝ち！🎉";
         playSE('win');
+        speak(pcHand + "。あなたの勝ち！");
     } else {
         resultMessage = "PCの勝ち！💻";
         playSE('lose');
+        speak(pcHand + "。わたしの勝ち！");
     }
 
     statusText.innerText = isAiko ? "あいこで..." : "結果発表！";
@@ -230,6 +241,7 @@ function resetGame(isAiko = false) {
     
     if (isAiko) {
         statusText.innerText = "しょ！（声か手を出してください）";
+        speak("しょ！"); // ★自動で再スタートする時に喋る
     } else {
         statusText.innerText = "音声で「グー・チョキ・パー」と言うか、カメラに手を見せてください";
     }
@@ -251,10 +263,14 @@ startBtn.addEventListener('click', () => {
     startBtn.style.display = 'none';
     statusText.innerText = "カメラとマイクを起動しています...";
     
-    // 【スマホ対応】ボタンを押した直後にマイクと音源を強制起動
     if (audioCtx.state === 'suspended') audioCtx.resume();
     if (recognition) {
         try { recognition.start(); } catch(e) {}
+    }
+    
+    // ★スマホ向けに音声合成の制限を解除（空の音声を一度だけ再生しておく）
+    if (window.speechSynthesis) {
+        window.speechSynthesis.speak(new SpeechSynthesisUtterance(''));
     }
     
     camera.start().then(() => {
