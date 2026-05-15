@@ -5,11 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AIじゃんけん - 最終形態</title>
     
-    <link rel="stylesheet" href="style.css?v=6">
+    <link rel="stylesheet" href="style.css?v=9">
     
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
-    
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 </head>
 <body>
@@ -23,9 +22,9 @@
         <p id="status-text">難易度を選んで「スタート」を押してください！</p>
         
         <div id="mode-area" class="mode-selection">
-            <button class="mode-btn" onclick="setDifficulty('hospitality')">🥂接待🥂</button>
-            <button class="mode-btn active" onclick="setDifficulty('normal')">ノーマル✊️✌️✋️</button>
-            <button class="mode-btn" onclick="setDifficulty('oni')">☠️絶望☠️</button>
+            <button id="btn-hospitality" class="mode-btn" onclick="setDifficulty('hospitality')">🥂接待🥂</button>
+            <button id="btn-normal" class="mode-btn active" onclick="setDifficulty('normal')">ノーマル✊️✌️✋️</button>
+            <button id="btn-oni" class="mode-btn" onclick="setDifficulty('oni')">☠️絶望☠️</button>
         </div>
 
         <button id="start-btn">ゲームスタート</button>
@@ -42,7 +41,7 @@
                     <div class="hp-bar-bg"><div id="player-hp-bar" class="hp-bar-fill"></div></div>
                 </div>
                 <div class="hp-container">
-                    <div class="hp-label">PC: <span id="pc-hp-text">100</span></div>
+                    <div class="hp-label">AI: <span id="pc-hp-text">100</span></div>
                     <div class="hp-bar-bg"><div id="pc-hp-bar" class="hp-bar-fill"></div></div>
                 </div>
             </div>
@@ -54,7 +53,7 @@
                 </div>
                 <div class="vs">VS</div>
                 <div class="pc-hand">
-                    <h3>PC</h3>
+                    <h3>AI</h3>
                     <div id="pc-hand-display" class="hand-icon">❔</div>
                 </div>
             </div>
@@ -64,6 +63,6 @@
         </div>
     </div>
     
-    <script src="script.js?v=8"></script>
+    <script src="script.js?v=9"></script>
 </body>
 </html>

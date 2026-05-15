@@ -181,3 +181,35 @@ button:hover {
 .mode-btn.active:hover {
     background: #3367d6;
 }
+/* --- ★ここから下を追加（デザイン上書き用） --- */
+/* 連勝カウンター（サイズを結果発表と同じくらい大きく） */
+.streak-container {
+    font-size: 24px !important;
+    padding: 10px 25px !important;
+}
+
+/* 難易度ボタンのベース設定（文字を黒に） */
+.mode-btn {
+    color: black !important;
+}
+
+/* 🥂接待🥂 が選択された時 */
+#btn-hospitality.active {
+    background-color: #ffb6c1 !important; /* ピンク */
+    border-color: #ffb6c1 !important;
+    color: black !important;
+}
+
+/* ノーマル✊️✌️✋️ が選択された時 */
+#btn-normal.active {
+    background-color: #e0e0e0 !important;
+    border-color: #ccc !important;
+    color: black !important;
+}
+
+/* ☠️絶望☠️ が選択された時 */
+#btn-oni.active {
+    background-color: #ff3333 !important; /* 赤 */
+    border-color: #cc0000 !important;
+    color: black !important;
+}
