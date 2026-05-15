@@ -24,6 +24,56 @@ const VOICE_DICTIONARY = {
 };
 
 // ==========================================
+// ★新規追加: 電子音(SE)を鳴らす機能
+// ==========================================
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+function playSE(type) {
+    // スマホの制限を解除（ユーザーがボタンを押した後に音を許可する）
+    if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+    }
+
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+
+    const now = audioCtx.currentTime;
+
+    if (type === 'win') {
+        // 勝ち：ピロリン！（明るい和音のアルペジオ）
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(523.25, now);        // ド
+        osc.frequency.setValueAtTime(659.25, now + 0.1);  // ミ
+        osc.frequency.setValueAtTime(783.99, now + 0.2);  // ソ
+        osc.frequency.setValueAtTime(1046.50, now + 0.3); // 高いド
+        gain.gain.setValueAtTime(0.5, now);
+        gain.gain.linearRampToValueAtTime(0, now + 0.5);
+        osc.start(now);
+        osc.stop(now + 0.5);
+    } else if (type === 'lose') {
+        // 負け：ブーッ...（低く下がる音）
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(150, now);
+        osc.frequency.linearRampToValueAtTime(80, now + 0.5);
+        gain.gain.setValueAtTime(0.3, now);
+        gain.gain.linearRampToValueAtTime(0, now + 0.5);
+        osc.start(now);
+        osc.stop(now + 0.5);
+    } else if (type === 'aiko') {
+        // あいこ：シュイッ！（素早く上がる音）
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(400, now);
+        osc.frequency.exponentialRampToValueAtTime(800, now + 0.1);
+        gain.gain.setValueAtTime(0.1, now);
+        gain.gain.linearRampToValueAtTime(0, now + 0.15);
+        osc.start(now);
+        osc.stop(now + 0.15);
+    }
+}
+
+// ==========================================
 // 1. 音声認識 (Web Speech API) のセットアップ
 // ==========================================
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -40,7 +90,6 @@ if (SpeechRecognition) {
 
         for (let i = event.resultIndex; i < event.results.length; ++i) {
             const transcript = event.results[i][0].transcript;
-            
             for (const [hand, words] of Object.entries(VOICE_DICTIONARY)) {
                 for (const word of words) {
                     if (transcript.includes(word)) {
@@ -64,7 +113,6 @@ if (SpeechRecognition) {
     };
 
 } else {
-    // スマホの画面に警告を出す
     alert("お使いのブラウザは音声認識に対応していません。iPhoneならSafari、AndroidならChromeをお使いください！");
 }
 
@@ -141,16 +189,20 @@ function executeGame(userHand, source) {
     const isAiko = (userHand === pcHand);
     let resultMessage = "";
 
+    // ★ここで勝敗に合わせて音を鳴らします！
     if (isAiko) {
         resultMessage = "あいこ！";
+        playSE('aiko');
     } else if (
         (userHand === 'グー' && pcHand === 'チョキ') ||
         (userHand === 'チョキ' && pcHand === 'パー') ||
         (userHand === 'パー' && pcHand === 'グー')
     ) {
         resultMessage = "あなたの勝ち！🎉";
+        playSE('win');
     } else {
         resultMessage = "PCの勝ち！💻";
+        playSE('lose');
     }
 
     statusText.innerText = isAiko ? "あいこで..." : "結果発表！";
@@ -199,7 +251,8 @@ startBtn.addEventListener('click', () => {
     startBtn.style.display = 'none';
     statusText.innerText = "カメラとマイクを起動しています...";
     
-    // 【スマホ対応】ボタンを押した直後にマイクを強制起動する（iOS対策）
+    // 【スマホ対応】ボタンを押した直後にマイクと音源を強制起動
+    if (audioCtx.state === 'suspended') audioCtx.resume();
     if (recognition) {
         try { recognition.start(); } catch(e) {}
     }
@@ -208,7 +261,6 @@ startBtn.addEventListener('click', () => {
         gameArea.style.display = 'block';
         resetGame();
     }).catch(err => {
-        // 【デバッグ追加】エラーが起きたらスマホ画面に直接ポップアップを出す
         alert("【カメラ起動エラー】 " + err);
         console.error(err);
         statusText.innerText = "カメラの起動に失敗しました。設定からカメラの権限を確認してください。";
